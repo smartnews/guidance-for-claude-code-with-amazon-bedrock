@@ -2228,7 +2228,7 @@ Available metrics include:
                     # Add monitoring configuration using Honeycomb
                     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
                     "OTEL_METRICS_EXPORTER": "otlp",
-                    "OTEL_METRIC_EXPORT_INTERVAL": "20000",
+                    "OTEL_METRIC_EXPORT_INTERVAL": "30000",
                     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
                     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.honeycomb.io",
                     "OTEL_EXPORTER_OTLP_HEADERS": "x-honeycomb-team=hcaik_api_token,x-honeycomb-dataset=<replace-with-dataset-name>",
