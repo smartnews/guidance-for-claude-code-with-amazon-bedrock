@@ -41,7 +41,7 @@ PROVIDER_CONFIGS = {
         "name": "Okta",
         "authorize_endpoint": "/oauth2/v1/authorize",
         "token_endpoint": "/oauth2/v1/token",
-        "scopes": "openid profile email",
+        "scopes": "openid profile email groups",
         "response_type": "code",
         "response_mode": "query",
     },
@@ -500,29 +500,10 @@ class MultiProviderAuth:
             # Non-fatal error - monitoring is optional
             self._debug_print(f"Warning: Could not save monitoring token: {e}")
 
-    def decode_jwt_payload(self, token):
-        """Decode the payload portion of a JWT token"""
-        try:
-            # Get the payload part (second segment)
-            _, payload_b64, _ = token.split(".")
-
-            # Add padding if needed
-            padding_needed = len(payload_b64) % 4
-            if padding_needed:
-                payload_b64 += "=" * (4 - padding_needed)
-
-            # Replace URL-safe characters and decode
-            payload_b64 = payload_b64.replace("-", "+").replace("_", "/")
-            decoded = base64.b64decode(payload_b64)
-            payload = json.loads(decoded)
-            return payload
-        except Exception as e:
-            self._debug_print(f"Error decoding JWT: {e}")
-            return {}
-
 
     def _extract_user_attributes_from_token(self, token_claims):
         """Extract user information from JWT claims for OTEL resource attributes"""
+        self._debug_print(f"Extracting user attributes from token: {token_claims}")
         # Extract basic user info
         email = (
             token_claims.get("email")
@@ -530,17 +511,28 @@ class MultiProviderAuth:
             or token_claims.get("mail")
             or "unknown@example.com"
         )
+        claims_groups = token_claims.get("groups")
 
-        # Extract team/department information - these fields vary by IdP
-        department = (
-            token_claims.get("department") or token_claims.get("dept") or token_claims.get("division") or "unspecified"
-        )
-        team = token_claims.get("team") or token_claims.get("team_id") or token_claims.get("group") or "default-team"
+        division = "unspecified"
+        department = "unspecified"
+        team = "unspecified"
+        group = "unspecified"
+        for claim_group in claims_groups or []:
+            if claim_group.startswith("department-"):
+                department = claim_group
+            elif claim_group.startswith("division-"):
+                division = claim_group
+            elif claim_group.startswith("team-"):
+                team = claim_group
+            elif claim_group.startswith("group-"):
+                group = claim_group
 
         return {
             "email": email,
-            "department": department,
+            "division": division,
             "team": team,
+            "department": department,
+            "group": group,
         }
 
 
@@ -549,7 +541,9 @@ class MultiProviderAuth:
         # Map attributes to resource attribute keys
         attr_mapping = {
             "email": "user.email",
+            "division": "user.division",
             "department": "user.department",
+            "group": "user.group",
             "team": "user.team",
         }
 
@@ -670,7 +664,7 @@ class MultiProviderAuth:
             if self.check_credentials_file_expiration(profile):
                 raise Exception("No AWS credentials found, authentication failed")
 
-            token_claims = self.decode_jwt_payload(token)
+            token_claims = jwt.decode(token, options={"verify_signature": False})
             self._debug_print(f"Extracting user attributes from token ...")
             user_attrs = self._extract_user_attributes_from_token(token_claims)
             otel_attrs = self._format_as_otel_resource_attributes(user_attrs)
