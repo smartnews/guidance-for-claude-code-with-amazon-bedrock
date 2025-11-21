@@ -45,9 +45,6 @@ CLAUDE.md
 guidance-docs/
 parameters.json
 
-# ccwb deployment config
-source/.ccwb-config/
-
 guidance-submission/
 tests/
 assets/docs/planning

@@ -1811,13 +1811,9 @@ cp "$CREDENTIAL_BINARY" ~/claude-code-with-bedrock/credential-process
 cp config.json ~/claude-code-with-bedrock/
 chmod +x ~/claude-code-with-bedrock/credential-process
 
-# macOS Keychain Notice
+# Un-quarantine the credential-process executable
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    echo
-    echo "⚠️  macOS Keychain Access:"
-    echo "   On first use, macOS will ask for permission to access the keychain."
-    echo "   This is normal and required for secure credential storage."
-    echo "   Click 'Always Allow' when prompted."
+    xattr -r -d com.apple.quarantine ~/claude-code-with-bedrock/credential-process
 fi
 
 # Copy Claude Code settings if present
@@ -1889,6 +1885,10 @@ cat >> ~/.aws/config << EOF
 credential_process = $HOME/claude-code-with-bedrock/credential-process
 region = $REGION
 EOF
+
+# Setup OTEL resource attributes in Claude settings
+echo "Setting up OpenTelemetry resource attributes..."
+~/claude-code-with-bedrock/credential-process --setup-otel-attrs
 
 echo
 echo "======================================"
@@ -2018,6 +2018,10 @@ if %errorlevel% equ 0 (
 ) else (
     echo WARNING: Authentication test failed. You may need to authenticate when first using the profile.
 )
+
+REM Setup OTEL resource attributes in Claude settings
+echo Setting up OpenTelemetry resource attributes...
+"%USERPROFILE%\claude-code-with-bedrock\credential-process.exe" --setup-otel-attrs >nul 2>&1
 
 echo.
 echo ======================================
@@ -2221,7 +2225,15 @@ Available metrics include:
                     "AWS_REGION": self._get_bedrock_region_for_profile(profile),
                     "CLAUDE_CODE_USE_BEDROCK": "1",
                     "AWS_PROFILE": "ClaudeCode",
-                }
+                    # Add monitoring configuration using Honeycomb
+                    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+                    "OTEL_METRICS_EXPORTER": "otlp",
+                    "OTEL_METRIC_EXPORT_INTERVAL": "30000",
+                    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+                    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://api.honeycomb.io",
+                    "OTEL_EXPORTER_OTLP_HEADERS": "x-honeycomb-team=hcaik_api_token,x-honeycomb-dataset=<replace-with-dataset-name>",
+                },
+                "alwaysThinkingEnabled": False,
             }
 
             # Add includeCoAuthoredBy setting if user wants to disable it (Claude Code defaults to true)
