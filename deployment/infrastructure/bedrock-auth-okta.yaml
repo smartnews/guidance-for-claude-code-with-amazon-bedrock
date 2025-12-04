@@ -94,6 +94,12 @@ Resources:
             Condition:
               StringEquals:
                 aws:ResourceTag/Shared: "true"
+          - Sid: AllowManageSubscriptions
+            Effect: Allow
+            Action:
+              - 'aws-marketplace:ViewSubscriptions'
+              - 'aws-marketplace:Subscribe'
+            Resource: '*'
           - Sid: AllowBedrockInvokeRegional
             Effect: Allow
             Action:
