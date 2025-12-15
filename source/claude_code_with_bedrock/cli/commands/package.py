@@ -1880,11 +1880,8 @@ else
 fi
 
 # Add new profile
-cat >> ~/.aws/config << EOF
-[profile ClaudeCode]
-credential_process = $HOME/claude-code-with-bedrock/credential-process
-region = $REGION
-EOF
+aws configure set credential_process "$HOME/claude-code-with-bedrock/credential-process" --profile ClaudeCode
+aws configure set region $REGION --profile ClaudeCode
 
 # Setup OTEL resource attributes in Claude settings
 echo "Setting up OpenTelemetry resource attributes..."
