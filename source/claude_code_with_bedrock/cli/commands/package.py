@@ -746,6 +746,8 @@ class PackageCommand(Command):
                 "--hidden-import=keyring.backends.SecretService",
                 "--hidden-import=keyring.backends.Windows",
                 "--hidden-import=keyring.backends.chainer",
+                "--hidden-import=jwt",
+                "--hidden-import=cryptography",
                 str(src_file),
             ]
         else:
