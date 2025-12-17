@@ -556,7 +556,7 @@ class MultiProviderAuth:
 
         return ",".join(attr_pairs)
 
-    def _fetch_honeycomb_config_from_secrets_manager(self, secret_name="shared/claude-code-for-everyone-otel-config", profile_name="ClaudeCode"):
+    def _fetch_honeycomb_config_from_secrets_manager(self, secret_name="shared/claude-code-for-everyone-otel-config"):
         """Fetch Honeycomb configuration for authentication from AWS Secrets Manager
 
         Args:
@@ -570,8 +570,14 @@ class MultiProviderAuth:
         """
         try:
             import boto3
+            credentials = self.get_cached_credentials()
+            if not credentials:
+                raise Exception("No AWS credentials found, authentication failed")
             session = boto3.Session(
-                profile_name=profile_name
+                region_name=self.config["aws_region"],
+                aws_access_key_id=credentials["AccessKeyId"],
+                aws_secret_access_key=credentials["SecretAccessKey"],
+                aws_session_token=credentials["SessionToken"]
             )
             secrets_client = session.client("secretsmanager")
             response = secrets_client.get_secret_value(SecretId=secret_name)
@@ -633,36 +639,23 @@ class MultiProviderAuth:
             json.dump(settings, f, indent=2)
         self._debug_print(f"Updated Claude settings with OTEL headers ...")
 
-    def update_claude_otel_settings(self, profile="ClaudeCode"):
+    def update_claude_otel_settings(self):
         """Update Claude OTEL settings
-
-        Args:
-            profile: AWS profile to use for fetching Secrets Manager config
         """
         self._debug_print("=== Starting OTEL settings update ===")
 
         try:
-            if self.check_credentials_file_expiration(profile):
-                self._debug_print("Credentials expired or missing, need refresh")
-                self.authenticate_for_monitoring()
-            else:
-                self._debug_print("Credentials found in cache")
-
-            # Get monitoring token
             self._debug_print("Getting monitoring token...")
             token = self.get_monitoring_token()
-
             if not token:
                 self._debug_print("No cached monitoring token found, attempting authentication...")
                 token = self.authenticate_for_monitoring()
             else:
                 self._debug_print("Using existing monitoring token from cache or environment")
 
-            # We must have the token and valid AWS credentials. Raise an error if not.
+            # We must have the token. Raise an error if not.
             if not token:
                 raise Exception("No monitoring token found, authentication failed")
-            if self.check_credentials_file_expiration(profile):
-                raise Exception("No AWS credentials found, authentication failed")
 
             token_claims = jwt.decode(token, options={"verify_signature": False})
             self._debug_print(f"Extracting user attributes from token ...")
@@ -671,9 +664,9 @@ class MultiProviderAuth:
             self._debug_print(f"OTEL resource attributes formatted: {otel_attrs[:100]}...")
             self._update_claude_otel_attributes(otel_attrs)
 
-            self._debug_print(f"Fetching Honeycomb config from Secrets Manager (profile: {profile})...")
+            self._debug_print(f"Fetching Honeycomb config from Secrets Manager...")
             try:
-                hc_config = self._fetch_honeycomb_config_from_secrets_manager(profile_name=profile)
+                hc_config = self._fetch_honeycomb_config_from_secrets_manager()
                 headers = [
                     f"x-honeycomb-team={hc_config['honeycomb_api_key']}",
                     f"x-honeycomb-dataset={hc_config['honeycomb_dataset_name']}",
@@ -782,6 +775,8 @@ class MultiProviderAuth:
             try:
                 with os.fdopen(temp_fd, "w") as f:
                     config.write(f)
+                    f.flush()
+                    os.fsync(f.fileno())
 
                 # Set restrictive permissions on temp file
                 os.chmod(temp_path, 0o600)
@@ -1098,15 +1093,15 @@ class MultiProviderAuth:
             # Auth0 often uses pipe-delimited format in sub claims (e.g., auth0|12345)
             # Sanitize to replace invalid characters with hyphens
             session_name = "claude-code"
-            if "sub" in token_claims:
-                # Use first 32 chars of sub for uniqueness, sanitized for AWS
-                sub_sanitized = re.sub(r"[^\w+=,.@-]", "-", str(token_claims["sub"])[:32])
-                session_name = f"claude-code-{sub_sanitized}"
-            elif "email" in token_claims:
+            if "email" in token_claims:
                 # Use email username part, sanitized
                 email_part = token_claims["email"].split("@")[0][:32]
                 email_sanitized = re.sub(r"[^\w+=,.@-]", "-", email_part)
                 session_name = f"claude-code-{email_sanitized}"
+            elif "sub" in token_claims:
+                # Use first 32 chars of sub for uniqueness, sanitized for AWS
+                sub_sanitized = re.sub(r"[^\w+=,.@-]", "-", str(token_claims["sub"])[:32])
+                session_name = f"claude-code-{sub_sanitized}"
 
             self._debug_print(f"Assuming role: {federated_role_arn}")
             self._debug_print(f"Session name: {session_name}")
@@ -1360,8 +1355,7 @@ class MultiProviderAuth:
                     if token:
                         return token
                     else:
-                        self._debug_print("Authentication timeout or failed in another process")
-                        return None
+                        self._debug_print("Authentication timeout or failed in another process. Proceeding with authentication in this process.")
                 else:
                     test_socket.close()
                     raise
@@ -1421,8 +1415,7 @@ class MultiProviderAuth:
                         return 0
                     else:
                         # Only print error to stderr for actual failures
-                        self._debug_print("Authentication timeout or failed in another process")
-                        return 1
+                        self._debug_print("Authentication timeout or failed in another process. Proceeding with authentication in this process.")
                 else:
                     test_socket.close()
                     raise
@@ -1449,7 +1442,7 @@ class MultiProviderAuth:
             self.save_monitoring_token(id_token, token_claims)
 
             # Update Claude settings with OTEL attributes
-            self.update_claude_otel_settings(profile=self.profile)
+            self.update_claude_otel_settings()
 
             # Output credentials
             # CodeQL: This is not a security issue - this is an AWS credential provider
