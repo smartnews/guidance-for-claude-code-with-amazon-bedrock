@@ -746,6 +746,8 @@ class PackageCommand(Command):
                 "--hidden-import=keyring.backends.SecretService",
                 "--hidden-import=keyring.backends.Windows",
                 "--hidden-import=keyring.backends.chainer",
+                "--hidden-import=jwt",
+                "--hidden-import=cryptography",
                 str(src_file),
             ]
         else:
@@ -1870,7 +1872,7 @@ echo "Configuring AWS profile..."
 mkdir -p ~/.aws
 
 # Remove old profile if exists
-sed -i.bak '/\\[profile ClaudeCode\\]/,/^$/d' ~/.aws/config 2>/dev/null || true
+sed -i.bak '/^\[profile ClaudeCode\]$/,/^\[/{{/^\[profile ClaudeCode\]$/d;/^\[/!d;}}' ~/.aws/config 2>/dev/null || true
 
 # Get region from package settings (for Bedrock calls, not infrastructure)
 if [ -f "claude-settings/settings.json" ]; then
@@ -1880,11 +1882,7 @@ else
 fi
 
 # Add new profile
-cat >> ~/.aws/config << EOF
-[profile ClaudeCode]
-credential_process = $HOME/claude-code-with-bedrock/credential-process
-region = $REGION
-EOF
+aws configure set region $REGION --profile ClaudeCode
 
 # Setup OTEL resource attributes in Claude settings
 echo "Setting up OpenTelemetry resource attributes..."
@@ -1894,12 +1892,6 @@ echo
 echo "======================================"
 echo "✓ Installation complete!"
 echo "======================================"
-echo
-echo "To use Claude Code authentication:"
-echo "  export AWS_PROFILE=ClaudeCode"
-echo "  aws sts get-caller-identity"
-echo
-echo "Note: Authentication will automatically open your browser when needed."
 echo
 """
 
@@ -2027,12 +2019,6 @@ echo.
 echo ======================================
 echo Installation complete!
 echo ======================================
-echo.
-echo To use Claude Code authentication:
-echo   set AWS_PROFILE=ClaudeCode
-echo   aws sts get-caller-identity
-echo.
-echo Note: Authentication will automatically open your browser when needed.
 echo.
 pause
 """

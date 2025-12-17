@@ -220,7 +220,7 @@ arch -x86_64 /usr/local/bin/brew install python@3.12
 arch -x86_64 /usr/local/bin/python3.12 -m venv ~/venv-x86
 
 # Step 4: Install required packages
-arch -x86_64 ~/venv-x86/bin/pip install pyinstaller boto3 keyring
+arch -x86_64 ~/venv-x86/bin/pip install pyinstaller boto3 keyring jwt cryptography
 ```
 
 **Behavior when Intel environment is not set up:**
