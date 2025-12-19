@@ -1842,6 +1842,11 @@ if [ -d "claude-settings" ]; then
         fi
 
         if [ "$SKIP_SETTINGS" != "true" ]; then
+            # backup the existing settings file
+            if [ -f ~/.claude/settings.json ] && ! grep -q 'CLAUDE_CODE_USE_BEDROCK' ~/.claude/settings.json; then
+                echo "Backing up existing settings file"
+                cp ~/.claude/settings.json ~/.claude/settings.json.bak
+            fi
             # Replace placeholders and write settings
             sed -e 's|__OTEL_HELPER_PATH__|~/claude-code-with-bedrock/otel-helper|g' \
                 "claude-settings/settings.json" > ~/.claude/settings.json
@@ -1976,6 +1981,14 @@ if exist "claude-settings" (
         )
 
         if not "%SKIP_SETTINGS%"=="true" (
+            REM Backup the existing settings file
+            if exist "%USERPROFILE%\\.claude\\settings.json" (
+                findstr /C:"CLAUDE_CODE_USE_BEDROCK" "%USERPROFILE%\\.claude\\settings.json" >nul 2>&1
+                if errorlevel 1 (
+                    echo Backing up existing settings file
+                    copy /Y "%USERPROFILE%\\.claude\\settings.json" "%USERPROFILE%\\.claude\\settings.json.bak" >nul
+                )
+            )
             REM Use PowerShell to replace placeholder
             powershell -Command "$path = '%USERPROFILE%\\claude-code-with-bedrock\\otel-helper.exe' -replace '\\\\', '/'; (Get-Content 'claude-settings\\settings.json') -replace '__OTEL_HELPER_PATH__', $path | Set-Content '%USERPROFILE%\\.claude\\settings.json'"
             echo OK Claude Code settings configured
