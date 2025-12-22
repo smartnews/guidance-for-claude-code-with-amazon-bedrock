@@ -210,9 +210,7 @@ class PackageCommand(Command):
                             '[dim]   arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"[/dim]'
                         )
                         console.print("[dim]2. Install Python and create environment:[/dim]")
-                        console.print("[dim]   arch -x86_64 /usr/local/bin/brew install python@3.12[/dim]")
-                        console.print("[dim]   arch -x86_64 /usr/local/bin/python3.12 -m venv ~/venv-x86[/dim]")
-                        console.print("[dim]   arch -x86_64 ~/venv-x86/bin/pip install pyinstaller boto3 keyring[/dim]")
+                        console.print("[dim]   Follow **Intel Mac Build Setup (Optional):** section in CLI_REFERENCE.md instructions for Intel Mac builds[/dim]")
                         console.print()
 
         # Build executable(s) using PyInstaller/Docker
@@ -746,8 +744,6 @@ class PackageCommand(Command):
                 "--hidden-import=keyring.backends.SecretService",
                 "--hidden-import=keyring.backends.Windows",
                 "--hidden-import=keyring.backends.chainer",
-                "--hidden-import=jwt",
-                "--hidden-import=cryptography",
                 str(src_file),
             ]
         else:
