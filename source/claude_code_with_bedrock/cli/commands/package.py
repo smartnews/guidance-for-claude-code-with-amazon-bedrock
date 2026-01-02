@@ -210,9 +210,7 @@ class PackageCommand(Command):
                             '[dim]   arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"[/dim]'
                         )
                         console.print("[dim]2. Install Python and create environment:[/dim]")
-                        console.print("[dim]   arch -x86_64 /usr/local/bin/brew install python@3.12[/dim]")
-                        console.print("[dim]   arch -x86_64 /usr/local/bin/python3.12 -m venv ~/venv-x86[/dim]")
-                        console.print("[dim]   arch -x86_64 ~/venv-x86/bin/pip install pyinstaller boto3 keyring[/dim]")
+                        console.print("[dim]   Follow **Intel Mac Build Setup (Optional):** section in CLI_REFERENCE.md instructions for Intel Mac builds[/dim]")
                         console.print()
 
         # Build executable(s) using PyInstaller/Docker
@@ -1840,6 +1838,11 @@ if [ -d "claude-settings" ]; then
         fi
 
         if [ "$SKIP_SETTINGS" != "true" ]; then
+            # backup the existing settings file
+            if [ -f ~/.claude/settings.json ] && ! grep -q 'CLAUDE_CODE_USE_BEDROCK' ~/.claude/settings.json; then
+                echo "Backing up existing settings file"
+                cp ~/.claude/settings.json ~/.claude/settings.json.bak
+            fi
             # Replace placeholders and write settings
             sed -e 's|__OTEL_HELPER_PATH__|~/claude-code-with-bedrock/otel-helper|g' \
                 "claude-settings/settings.json" > ~/.claude/settings.json
@@ -1870,7 +1873,7 @@ echo "Configuring AWS profile..."
 mkdir -p ~/.aws
 
 # Remove old profile if exists
-sed -i.bak '/\\[profile ClaudeCode\\]/,/^$/d' ~/.aws/config 2>/dev/null || true
+sed -i.bak '/^\[profile ClaudeCode\]$/,/^\[/{{/^\[profile ClaudeCode\]$/d;/^\[/!d;}}' ~/.aws/config 2>/dev/null || true
 
 # Get region from package settings (for Bedrock calls, not infrastructure)
 if [ -f "claude-settings/settings.json" ]; then
@@ -1880,11 +1883,7 @@ else
 fi
 
 # Add new profile
-cat >> ~/.aws/config << EOF
-[profile ClaudeCode]
-credential_process = $HOME/claude-code-with-bedrock/credential-process
-region = $REGION
-EOF
+aws configure set region $REGION --profile ClaudeCode
 
 # Setup OTEL resource attributes in Claude settings
 echo "Setting up OpenTelemetry resource attributes..."
@@ -1894,12 +1893,6 @@ echo
 echo "======================================"
 echo "✓ Installation complete!"
 echo "======================================"
-echo
-echo "To use Claude Code authentication:"
-echo "  export AWS_PROFILE=ClaudeCode"
-echo "  aws sts get-caller-identity"
-echo
-echo "Note: Authentication will automatically open your browser when needed."
 echo
 """
 
@@ -1984,6 +1977,14 @@ if exist "claude-settings" (
         )
 
         if not "%SKIP_SETTINGS%"=="true" (
+            REM Backup the existing settings file
+            if exist "%USERPROFILE%\\.claude\\settings.json" (
+                findstr /C:"CLAUDE_CODE_USE_BEDROCK" "%USERPROFILE%\\.claude\\settings.json" >nul 2>&1
+                if errorlevel 1 (
+                    echo Backing up existing settings file
+                    copy /Y "%USERPROFILE%\\.claude\\settings.json" "%USERPROFILE%\\.claude\\settings.json.bak" >nul
+                )
+            )
             REM Use PowerShell to replace placeholder
             powershell -Command "$path = '%USERPROFILE%\\claude-code-with-bedrock\\otel-helper.exe' -replace '\\\\', '/'; (Get-Content 'claude-settings\\settings.json') -replace '__OTEL_HELPER_PATH__', $path | Set-Content '%USERPROFILE%\\.claude\\settings.json'"
             echo OK Claude Code settings configured
@@ -2027,12 +2028,6 @@ echo.
 echo ======================================
 echo Installation complete!
 echo ======================================
-echo.
-echo To use Claude Code authentication:
-echo   set AWS_PROFILE=ClaudeCode
-echo   aws sts get-caller-identity
-echo.
-echo Note: Authentication will automatically open your browser when needed.
 echo.
 pause
 """
